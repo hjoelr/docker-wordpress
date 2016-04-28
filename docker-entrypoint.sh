@@ -37,6 +37,29 @@ if [[ "$1" == apache2* ]] || [ "$1" == php-fpm ]; then
 
 	WEBSERVER_ROOT="$PWD"
 
+	if [ ! -e "${WEBSERVER_ROOT}/.htaccess" ]; then
+		# NOTE: The "Indexes" option is disabled in the php:apache base image
+		cat > "${WEBSERVER_ROOT}/.htaccess" <<-'EOF'
+			# BEGIN WordPress
+			<IfModule mod_rewrite.c>
+			RewriteEngine On
+			RewriteBase /
+			RewriteRule ^index\.php$ - [L]
+			RewriteCond %{REQUEST_FILENAME} !-f
+			RewriteCond %{REQUEST_FILENAME} !-d
+			RewriteRule . /index.php [L]
+			</IfModule>
+			# END WordPress
+		EOF
+		chown www-data:www-data "${WEBSERVER_ROOT}/.htaccess"
+	fi
+
+	CURSITE=1
+	eval TMP_SITE_DATA=\$WORDPRESS_SITE$CURSITE
+	while [ -n "$TMP_SITE_DATA"]; do
+		echo $TMP_SITE_DATA
+	done
+
 	if [ -n "$WORDPRESS_SUBDIR" ]; then
 
 		# Remove beginning slash if it exists
@@ -61,23 +84,6 @@ if [[ "$1" == apache2* ]] || [ "$1" == php-fpm ]; then
 		fi
 		tar cf - --one-file-system -C /usr/src/wordpress . | tar xf -
 		echo >&2 "Complete! WordPress has been successfully copied to $(pwd)"
-	fi
-
-	if [ ! -e "${WEBSERVER_ROOT}/.htaccess" ]; then
-		# NOTE: The "Indexes" option is disabled in the php:apache base image
-		cat > "${WEBSERVER_ROOT}/.htaccess" <<-'EOF'
-			# BEGIN WordPress
-			<IfModule mod_rewrite.c>
-			RewriteEngine On
-			RewriteBase /
-			RewriteRule ^index\.php$ - [L]
-			RewriteCond %{REQUEST_FILENAME} !-f
-			RewriteCond %{REQUEST_FILENAME} !-d
-			RewriteRule . /index.php [L]
-			</IfModule>
-			# END WordPress
-		EOF
-		chown www-data:www-data "${WEBSERVER_ROOT}/.htaccess"
 	fi
 
 	# TODO handle WordPress upgrades magically in the same way, but only if wp-includes/version.php's $wp_version is less than /usr/src/wordpress/wp-includes/version.php's $wp_version
